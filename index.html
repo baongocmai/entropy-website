@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Extended Ergodic Entropy & Transformations</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+
+  <style>
+    :root {
+      --main-bg: #f7fafd;
+      --panel-bg: #ffffff;
+      --accent: #3498db;
+      --accent-dark: #2980b9;
+      --text-dark: #2c3e50;
+      --text-muted: #7f8c8d;
+      --border: #dcdfe6;
+      --shadow: 0 6px 18px rgba(0, 0, 0, 0.05);
+    }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: var(--main-bg);
+      padding: 40px 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: auto;
+      background: var(--panel-bg);
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+    }
+
+    canvas, #heatmapContainer {
+      display: block;
+      margin: 25px auto 0 auto;
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      width: 100% !important;
+      aspect-ratio: 16 / 9;
+      height: auto !important;
+    }
+
+    h1 {
+      text-align: center;
+      color: var(--text-dark);
+      margin-bottom: 20px;
+      font-size: 2rem;
+    }
+
+    h2 {
+      color: var(--text-dark);
+      margin-top: 50px;
+      font-size: 1.5rem;
+      border-bottom: 2px solid var(--accent);
+      padding-bottom: 8px;
+    }
+
+    label {
+      font-weight: 600;
+      color: var(--text-dark);
+      margin-top: 16px;
+      display: block;
+    }
+
+    textarea, input, select, button {
+      width: 100%;
+      padding: 10px 14px;
+      font-size: 1rem;
+      margin-top: 8px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-sizing: border-box;
+      background-color: #fff;
+    }
+
+    button {
+      background: var(--accent-dark);
+      color: white;
+      font-weight: 600;
+      border: none;
+      transition: background 0.3s;
+      margin-top: 20px;
+    }
+
+button:hover {
+  background: var(--accent);
+  color:#b9294b;
+}
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .result {
+      background: #eef6fb;
+      padding: 16px;
+      border-radius: 8px;
+      margin-top: 20px;
+      font-family: 'Courier New', monospace;
+      white-space: pre-wrap;
+    }
+
+    #animationContainer {
+      margin-top: 20px;
+      font-family: 'Courier New', monospace;
+      background: #fff;
+      border: 1px solid var(--border);
+      padding: 16px;
+      height: 60px;
+      overflow-x: auto;
+      white-space: nowrap;
+      border-radius: 6px;
+      box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
+      font-size: 1.2rem;
+    }
+
+    .footer {
+      margin-top: 60px;
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    @media (max-width: 768px) {
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Extended Ergodic Entropy & Transformations</h1>
+
+    <label>Enter multiple binary sequences (one per line):</label>
+    <textarea id="multiSeqInput" rows="5" placeholder="Example:
+0101010101
+1110001110
+1010101010"></textarea>
+
+    <small style="color: var(--text-muted); display:block; margin-top: 4px">
+      Tip: You can press <strong>Enter</strong> to run the simulation faster.
+    </small>
+
+    <div class="grid-2">
+      <div>
+        <label>Select n-gram size:</label>
+        <select id="ngramSize">
+          <option value="1">1-gram</option>
+          <option value="2" selected>2-gram</option>
+          <option value="3">3-gram</option>
+          <option value="4">4-gram</option>
+        </select>
+      </div>
+      <div>
+        <label>Select transformation:</label>
+        <select id="transformation">
+          <option value="leftShift">Shift Left</option>
+          <option value="rightShift">Shift Right</option>
+          <option value="rotate">Rotate</option>
+          <option value="bitFlip">Bit Flip (Random)</option>
+          <option value="shuffle">Shuffle Random</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div>
+        <label>Bit Flip Probability (0 - 1):</label>
+        <input type="number" id="bitFlipProb" min="0" max="1" step="0.01" value="0.1" />
+      </div>
+      <div>
+        <label>Number of Transformation Steps:</label>
+        <input type="number" id="steps" min="1" max="50" value="10" />
+      </div>
+    </div>
+
+    <button onclick="runSimulation()">Run Simulation</button>
+
+<div style="text-align: center; margin-top: 20px;">
+  <button onclick="resetSimulation()" style="width: 150px; background-color: #fcb6cf;">
+    Reset
+  </button>
+</div>
+    <div class="result" id="entropyResult"></div>
+
+    <h2>Entropy over Steps</h2>
+    <canvas id="entropyChart"></canvas>
+
+    <h2>Entropy Heatmap (All Sequences)</h2>
+    <div id="heatmapContainer"></div>
+
+    <h2>Final Step N-gram Frequency Comparison</h2>
+    <canvas id="freqChart"></canvas>
+
+    <h2>Animation of Sequence Changes (First Sequence)</h2>
+    <div id="animationContainer"></div>
+
+    <div class="footer">&copy; 2025 Entropy Explorer — Developed by Group 1</div>
+  </div>
+
+  <script>
+window.onload = () => {
+  const ctx = document.getElementById('entropyChart').getContext('2d');
+  entropyChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: []
+    },
+    options: {
+      responsive: true,
+      plugins: { title: { display: true, text: 'Entropy over transformation steps' } },
+      scales: {
+        x: { title: { display: true, text: 'Step' }},
+        y: { title: { display: true, text: 'Entropy (bits)' }, beginAtZero: true, suggestedMax: 1 }
+      }
+    }
+  });
+};
+
+let entropyChart, freqChart, animationInterval;
+let currentSequences = [];
+let currentStepIndex = 0;
+
+function highlightChanges(current, previous) {
+  if (!previous) return current;
+  let result = '';
+  for (let i = 0; i < current.length; i++) {
+    if (current[i] !== previous[i]) {
+      result += `<span style="color: red; font-weight: bold">${current[i]}</span>`;
+    } else {
+      result += current[i];
+    }
+  }
+  return result;
+}
+
+function animateSequence(seqArray) {
+  currentSequences = seqArray;
+  currentStepIndex = 0;
+  document.getElementById('animationContainer').innerHTML = highlightChanges(seqArray[0], null);
+  clearInterval(animationInterval);
+  animationInterval = setInterval(() => {
+    currentStepIndex = (currentStepIndex + 1) % seqArray.length;
+    document.getElementById('animationContainer').innerHTML = highlightChanges(seqArray[currentStepIndex], seqArray[currentStepIndex - 1] || '');
+  }, 700);
+}
+
+function nextStep() {
+  if (!currentSequences.length || currentStepIndex >= currentSequences.length) return;
+  const prev = currentStepIndex > 0 ? currentSequences[currentStepIndex - 1] : null;
+  document.getElementById('animationContainer').innerHTML = highlightChanges(currentSequences[currentStepIndex], prev);
+  currentStepIndex++;
+}
+
+function resetSimulation() {
+  if (entropyChart) entropyChart.destroy();
+  if (freqChart) freqChart.destroy();
+  Plotly.purge('heatmapContainer');
+  clearInterval(animationInterval);
+  document.getElementById("entropyResult").textContent = "";
+  document.getElementById("animationContainer").innerHTML = "";
+  currentSequences = [];
+  currentStepIndex = 0;
+}
+
+function drawEntropyChart(results, steps, n, randomResults = null) {
+  const labels = Array.from({length: steps + 1}, (_, i) => `Step ${i}`);
+  const datasets = [];
+  const maxEntropy = Math.log2(Math.pow(2, n));
+
+  datasets.push({
+    label: 'Theoretical Max Entropy',
+    data: Array(steps + 1).fill(maxEntropy),
+    borderColor: 'gray',
+    borderDash: [4, 4],
+    fill: false,
+    tension: 0.1
+  });
+
+  results.forEach((r, i) => {
+    datasets.push({
+      label: `Seq ${i+1}`,
+      data: [r.entropyValues[0], ...r.entropyValues],
+      borderColor: `hsl(${(i*60)%360}, 70%, 50%)`,
+      fill: false,
+      tension: 0.3
+    });
+    if (randomResults) {
+      datasets.push({
+        label: `Random ${i+1}`,
+        data: [randomResults[i].entropyValues[0], ...randomResults[i].entropyValues],
+        borderDash: [5, 5],
+        borderColor: `hsl(${(i*60+30)%360}, 70%, 50%)`,
+        fill: false,
+        tension: 0.3
+      });
+    }
+  });
+
+  const ctx = document.getElementById('entropyChart').getContext('2d');
+  if (entropyChart) entropyChart.destroy();
+  entropyChart = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      plugins: { title: { display: true, text: 'Entropy over transformation steps' } },
+      scales: {
+        x: { title: { display: true, text: 'Step' }},
+        y: {
+          title: { display: true, text: 'Entropy (bits)' },
+          beginAtZero: true,
+          suggestedMax: maxEntropy
+        }
+      }
+    }
+  });
+}
+
+function leftShift(seq, steps=1) {
+  steps %= seq.length;
+  return seq.slice(steps) + seq.slice(0, steps);
+}
+
+function rightShift(seq, steps=1) {
+  steps %= seq.length;
+  return seq.slice(-steps) + seq.slice(0, seq.length - steps);
+}
+
+function rotate(seq, steps=1) {
+  return leftShift(seq, steps);
+}
+
+function bitFlip(seq, p=0.1) {
+  return [...seq].map(ch => Math.random() < p ? (ch === '0' ? '1' : '0') : ch).join('');
+}
+
+function shuffle(seq) {
+  return [...seq].sort(() => Math.random() - 0.5).join('');
+}
+
+function getNgrams(seq, n) {
+  const ngrams = [];
+  for (let i = 0; i <= seq.length - n; i++) {
+    ngrams.push(seq.slice(i, i + n));
+  }
+  return ngrams;
+}
+
+function getCounts(ngrams) {
+  const counts = {};
+  ngrams.forEach(g => counts[g] = (counts[g] || 0) + 1);
+  return counts;
+}
+
+function computeEntropy(counts, total) {
+  let entropy = 0;
+  for (const c of Object.values(counts)) {
+    const p = c / total;
+    entropy -= p * Math.log2(p);
+  }
+  return entropy;
+}
+
+function applyTransformation(seq, type, p=0.1, step=1) {
+  switch(type) {
+    case 'leftShift': return leftShift(seq, step);
+    case 'rightShift': return rightShift(seq, step);
+    case 'rotate': return rotate(seq, step);
+    case 'bitFlip': return bitFlip(seq, p);
+    case 'shuffle': return shuffle(seq);
+    default: return seq;
+  }
+}
+
+function computeEntropyOverSteps(seq, n, steps, transType, p) {
+  let current = seq;
+  const entropyValues = [];
+  const sequencesOverTime = [current];
+  for(let i=0; i<steps; i++) {
+    const ngrams = getNgrams(current, n);
+    const counts = getCounts(ngrams);
+    const entropy = computeEntropy(counts, ngrams.length);
+    entropyValues.push(entropy);
+    current = applyTransformation(current, transType, p);
+    sequencesOverTime.push(current);
+  }
+  return { entropyValues, sequencesOverTime };
+}
+
+function runSimulation() {
+  clearInterval(animationInterval);
+  const rawInput = document.getElementById('multiSeqInput').value.trim();
+  const n = parseInt(document.getElementById('ngramSize').value);
+  const transType = document.getElementById('transformation').value;
+  const p = parseFloat(document.getElementById('bitFlipProb').value);
+  const steps = parseInt(document.getElementById('steps').value);
+
+  if (!rawInput) {
+    alert("Please enter at least one binary sequence.");
+    return;
+  }
+  const sequences = rawInput.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+  for(const seq of sequences) {
+    if(!/^[01]+$/.test(seq)) {
+      alert("Error: Sequences must contain only 0 and 1.");
+      return;
+    }
+    if(seq.length < n) {
+      alert(`Error: Each sequence must be at least length ${n} for the selected n-gram.`);
+      return;
+    }
+  }
+
+  const results = sequences.map(seq => computeEntropyOverSteps(seq, n, steps, transType, p));
+
+  const randomResults = sequences.map(seq => {
+    const randSeq = [...seq].map(() => Math.random() < 0.5 ? '0' : '1').join('');
+    return computeEntropyOverSteps(randSeq, n, steps, transType, p);
+  });
+
+  let text = "Entropy over steps:\n";
+  results.forEach((r, i) => {
+    const avg = r.entropyValues.reduce((a,b)=>a+b,0)/r.entropyValues.length;
+    text += `Seq ${i+1}: Avg Entropy = ${avg.toFixed(4)} bits\n`;
+  });
+  document.getElementById('entropyResult').textContent = text;
+
+  drawEntropyChart(results, steps, n, randomResults);
+  drawFreqComparison(sequences[0], results[0].sequencesOverTime.at(-1), n);
+  animateSequence(results[0].sequencesOverTime);
+  drawEntropyHeatmap(results, steps);
+}
+function drawFreqComparison(originalSeq, finalSeq, n) {
+  const originalCounts = getCounts(getNgrams(originalSeq, n));
+  const finalCounts = getCounts(getNgrams(finalSeq, n));
+  const labels = Array.from(new Set([...Object.keys(originalCounts), ...Object.keys(finalCounts)])).sort();
+  const dataOriginal = labels.map(l => originalCounts[l] || 0);
+  const dataFinal = labels.map(l => finalCounts[l] || 0);
+  const ctx = document.getElementById('freqChart').getContext('2d');
+  if(freqChart) freqChart.destroy();
+  freqChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Original', data: dataOriginal, backgroundColor: 'rgba(54, 162, 235, 0.6)' },
+        { label: 'Final', data: dataFinal, backgroundColor: 'rgba(255, 99, 132, 0.6)' }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { title: { display: true, text: `N-gram Frequency Comparison (n=${n})` } },
+      scales: {
+        x: { title: { display: true, text: 'N-gram' } },
+        y: { title: { display: true, text: 'Count' }, beginAtZero: true }
+      }
+    }
+  });
+}
+
+function drawEntropyHeatmap(results, steps) {
+  const z = results.map(r => r.entropyValues);
+  const y = results.map((_, i) => `Seq ${i+1}`);
+  const x = Array.from({ length: steps }, (_, i) => `Step ${i+1}`);
+  const data = [{
+    z,
+    x,
+    y,
+    type: 'heatmap',
+    colorscale: 'YlGnBu',
+    showscale: true
+  }];
+  Plotly.newPlot('heatmapContainer', data, {
+    title: 'Entropy Heatmap',
+    xaxis: { title: 'Step' },
+    yaxis: { title: 'Sequence' }
+  });
+}
+document.getElementById("multiSeqInput").addEventListener("keydown", function(e) {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault(); // tránh xuống dòng
+    runSimulation();
+  }
+});
+
+</script>
+</body>
+</html>
